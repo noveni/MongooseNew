@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>mongoose</name>
+	<displayName><![CDATA[Mongoose - Dropshipping module]]></displayName>
+	<version><![CDATA[1.0.0]]></version>
+	<description><![CDATA[This module handle the dropshipping feature from external supplier]]></description>
+	<author><![CDATA[noveni]]></author>
+	<tab><![CDATA[quick_bulk_update]]></tab>
+	<confirmUninstall><![CDATA[Are you sure you want to uninstall?]]></confirmUninstall>
+	<is_configurable>0</is_configurable>
+	<need_instance>0</need_instance>
+	<limited_countries></limited_countries>
+</module>
