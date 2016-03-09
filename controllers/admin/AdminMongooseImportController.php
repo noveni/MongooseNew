@@ -1,11 +1,9 @@
 <?php
 
-require_once (dirname(__file__) . '/../../classes/application/ApplicationService.php');
+require_once (dirname(__file__) . '/../../classes/application/MongooseApplicationService.php');
 require_once (dirname(__file__) . '/../../classes/MongooseProduct.php');
 require_once (dirname(__file__) . '/../../classes/MongooseCategory.php');
 require_once (dirname(__file__) . '/../../classes/MongooseManufacturer.php');
-// require_once (dirname(__file__) . '/../../classes/MongooseAttribute.php');
-// require_once (dirname(__file__) . '/../../classes/MongooseAttributeGroup.php');
 require_once (dirname(__file__) . '/../../classes/MongooseProductAttribute.php');
 require_once (dirname(__file__) . '/../../classes/MongooseSupplierConfig.php');
 
@@ -40,7 +38,7 @@ class AdminMongooseImportController extends ModuleAdminController
 
 	public function renderList()
 	{
-		// $this->importLineFromFile($this->src_content->product[(int)$this->src_current_line]);
+		// $this->importLineFromFile($this->src_content->product[7269]);
 		// d('bye');
 		// $this->transfertLineFromDb();
 		// d('bye');
@@ -121,7 +119,7 @@ class AdminMongooseImportController extends ModuleAdminController
 	public function stepZeroHTML() //Initial form to add file and choose lang
 	{
 		$lang_options = array();
-		foreach(Language::getLanguages(true) as $lang)
+		foreach(Language::getLanguages(false) as $lang)
 		{
 			$lang_options[] = array(
 				'id' => (string)$lang['id_lang'],
@@ -168,15 +166,6 @@ class AdminMongooseImportController extends ModuleAdminController
 		return $helper->generateForm($fields_form);
 	}
 
-	public function stepTwoHTML()
-	{
-		$this->context->smarty->assign(array(
-			'mongoose_products_total' => MongooseProduct::count(),
-			'current_mongoose_product_row' => $this->mongoose_product_current_line
-		));
-		return $this->context->smarty->fetch(_PS_MODULE_DIR_.'mongoose/views/templates/admin/steptwo.tpl');
-	}
-
 	public function stepOneHTML()
 	{
 		//Ici on va demander au client de cliquer sur un bouton pour démarrer un import vers une table intermédiaire
@@ -188,6 +177,16 @@ class AdminMongooseImportController extends ModuleAdminController
 		));
 		return $this->context->smarty->fetch(_PS_MODULE_DIR_.'mongoose/views/templates/admin/stepone.tpl');
 	}
+	
+	public function stepTwoHTML()
+	{
+		$this->context->smarty->assign(array(
+			'mongoose_products_total' => MongooseProduct::count(),
+			'current_mongoose_product_row' => $this->mongoose_product_current_line
+		));
+		return $this->context->smarty->fetch(_PS_MODULE_DIR_.'mongoose/views/templates/admin/steptwo.tpl');
+	}
+
 
 	private function uploadXml()
 	{
@@ -248,6 +247,7 @@ class AdminMongooseImportController extends ModuleAdminController
 
 		if($this->src_current_line < $this->src_line_total){
 			//Import
+
 			if ($line_imported = $this->importLineFromFile($this->src_content->product[(int)$this->src_current_line])){
 				++$this->src_current_line;
 				$return['product'] = $line_imported;
@@ -293,6 +293,7 @@ class AdminMongooseImportController extends ModuleAdminController
 	private function transfertLineFromDb()
 	{
 		
+		$return = array();	
 		$id_lang_fr = (int)Language::getIdByIso('fr');//$this->src_id_lang
 		//$id_lang = $this->getLang();
 		//$this->current_mongoose_product_row = Configuration::get('MONGOOSE_PRODUCT_CURRENT_ROW');
@@ -302,6 +303,12 @@ class AdminMongooseImportController extends ModuleAdminController
 			$id_mongoose_product = $results[0]['id_mongoose_product'];
 			$mongoose_product = new MongooseProduct($id_mongoose_product);
 			$id_product = (int)Db::getInstance()->getValue('SELECT id_product FROM '._DB_PREFIX_.'product WHERE reference = \''.pSQL($mongoose_product->reference).'\'');
+			
+			if ($id_product)
+				$return['maj'] = 'Mise à jour du produit';
+			else
+				$return['add'] = 'Rajout du produit';
+
 			$product = $id_product ? new Product((int)$id_product, true) : new Product();
 			$product->reference = $mongoose_product->reference;
 			$product->price = (float)$mongoose_product->price;
@@ -395,7 +402,7 @@ class AdminMongooseImportController extends ModuleAdminController
 			}
 	
 			if(!$product->save())
-				ApplicationService::log('Add product in ps','[pid:'.(int)$mongoose_product->id_mongoose_product.'] Cannot save product.');
+				MongooseApplicationService::log('Add product in ps','[pid:'.(int)$mongoose_product->id_mongoose_product.'] Cannot save product.');
 
 			// Attribute
 			$mongoose_product_attribute = MongooseProductAttribute::getByIdMgProduct($mongoose_product->id);
@@ -433,16 +440,9 @@ class AdminMongooseImportController extends ModuleAdminController
 				}
 
 
-				//p($attribute_combination);
-	// 			public function updateAttribute($id_product_attribute, $wholesale_price, $price, $weight, $unit, $ecotax,
-	// 	$id_images, $reference, $ean13, $default, $location = null, $upc = null, $minimal_quantity = null, $available_date = null, $update_all_fields = true, array $id_shop_list = array())
-	// {
-				//public function addAttribute($price, $weight, $unit_impact, $ecotax, $id_images, $reference, $ean13,
-				// $default, $location = null, $upc = null, $minimal_quantity = 1, array $id_shop_list = array(), $available_date = null)
+				
 	
 			}
-			//$product->getAttributeCombinations($id_lang_fr));
-			//d('bye');
 
 
 			//Category
@@ -507,26 +507,54 @@ class AdminMongooseImportController extends ModuleAdminController
 			
 		}
 		//p($product);
-		return $product;
+
+		$return['id_product'] = $product->id;
+		$return['product'] = $product;
+		
+		return $return;
 	}
+	
 	private function importLineFromFile($src_line)
 	{
 		$id_lang_fr = (int)Language::getIdByIso('fr');
-		//p($src_line);
+
+		if(empty($src_line->title))
+			$src_line->title = (string)$src_line->artnr;
 		// Adding product
 		if($id_mongoose_product = MongooseProduct::getIdMongooseProductByIdSupplier((int)$src_line->id))
 		{
 			$product = new MongooseProduct($id_mongoose_product);
+			if(empty($product->name[Configuration::get('PS_LANG_DEFAULT')]))
+				$product->name[Configuration::get('PS_LANG_DEFAULT')] = (string)$src_line->title;
+			$product->name[(int)$this->src_id_lang] = (string)$src_line->title;
+			if(empty($product->link_rewrite[Configuration::get('PS_LANG_DEFAULT')]))
+				$product->link_rewrite[Configuration::get('PS_LANG_DEFAULT')] = (string)$src_line->title;
+			$product->link_rewrite[(int)$this->src_id_lang] = Tools::link_rewrite((string)$src_line->title);
+			//$product->name = array((int)$this->src_id_lang => (string)$src_line->title);
 		}
 		else
 		{
 			$product = new MongooseProduct();
 			$product->id_product_supplier = (int)$src_line->id;
+			//If title is empty we use the artnr value
+
+			// If it's a new product without and if the default language is not the same as the actual lang
+			if(Configuration::get('PS_LANG_DEFAULT') != (int)$this->src_id_lang){
+				$product->name = array((int)$this->src_id_lang => (string)$src_line->title,
+										Configuration::get('PS_LANG_DEFAULT') => (string)$src_line->title);
+				$product->link_rewrite = array((int)$this->src_id_lang => Tools::link_rewrite((string)$src_line->title),
+										Configuration::get('PS_LANG_DEFAULT') => Tools::link_rewrite((string)$src_line->title) );
+			} else {
+				$product->name = array((int)$this->src_id_lang => (string)$src_line->title);
+				$product->link_rewrite = array((int)$this->src_id_lang => Tools::link_rewrite((string)$src_line->title));
+			}
 		}
+
 		$product->reference = (string)$src_line->artnr;
-		$product->name = array((int)$this->src_id_lang => (string)$src_line->title);
-		$product->description = array((int)$this->src_id_lang => (string)$src_line->description);
-		$product->link_rewrite = array((int)$this->src_id_lang => Tools::link_rewrite((string)$src_line->title));
+		//$product->name = array((int)$this->src_id_lang => (string)$src_line->title);
+
+		$product->description[$this->src_id_lang] = (string)$src_line->description;
+		//$product->link_rewrite = array((int)$this->src_id_lang => Tools::link_rewrite((string)$src_line->title));
 		//$product->date_add = (string)$src_line->date;
 		//$product->date_upd = (string)$src_line->modifydate;
 		$product->price = (float)number_format($src_line->price->b2c / (1 + 21 / 100), 6, '.', '');
@@ -551,21 +579,31 @@ class AdminMongooseImportController extends ModuleAdminController
 		if($id_mongoose_manufacturer = MongooseManufacturer::getIdMongooseSupplierByIdSupplier($src_line->brand->id))
 		{
 			$manufacturer = new MongooseManufacturer($id_mongoose_manufacturer,(int)$this->src_id_lang);
-			$manufacturer->title = array((int)$this->src_id_lang => (string)$src_line->brand->title);
-			if(!$manufacturer->save())
-				ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Manufacturer can t be updated.');
-		} else {
+		} 
+		else 
+		{
 			$manufacturer = new MongooseManufacturer();
-			$manufacturer->id_manufacturer_supplier = (int)$src_line->brand->id;
-			$manufacturer->title = array((int)$this->src_id_lang => (string)$src_line->brand->title);
-			if(!$manufacturer->save())
-				ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Manufacturer can t be added.');
 		}
+		$manufacturer->id_manufacturer_supplier = (int)$src_line->brand->id;
+		
+		if(Configuration::get('PS_LANG_DEFAULT') != (int)$this->src_id_lang)
+		{
+			 $manufacturer_title = array((int)$this->src_id_lang => (string)$src_line->brand->title,
+										Configuration::get('PS_LANG_DEFAULT') => (string)$src_line->brand->title);
+		}
+		else
+		{
+			$manufacturer_title = array((int)$this->src_id_lang => (string)$src_line->brand->title);
+		}
+		$manufacturer->title = $manufacturer_title;
+
+		if(!$manufacturer->save())
+			MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Manufacturer can t be updated.');
+		
 		$product->id_manufacturer_supplier = $manufacturer->id;
 
 		if(!$product->save())
-			ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Product can t be saved.');
-		
+			MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Product can t be saved.');
 
 		// Now i've got the id product
 		// I can do the rest of the install
@@ -589,21 +627,30 @@ class AdminMongooseImportController extends ModuleAdminController
 				//Tester si la categories existe déjà
 				if ($id_mongoose_category = MongooseCategory::getIdMongooseCategoryByIdSupplier((int)$src_line->categories->category[$l]->cat[$m]->id))
 				{
-					$category = new MongooseCategory($id_mongoose_category,(int)$src_line->categories->category[$l]->cat[$m]->id);
-					$category->title = array((int)$this->src_id_lang => (string)$src_line->categories->category[$l]->cat[$m]->title);
-					$category->id_category_parent = (int)$id_parent;
-					if(!$category->save())
-						ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Categories '.$category->title.' can t be updated.');
+					$category = new MongooseCategory($id_mongoose_category);
+					$category->title[(int)$this->src_id_lang] = (string)$src_line->categories->category[$l]->cat[$m]->title;
+					//p($category);
+					//$category->title = array((int)$this->src_id_lang => (string)$src_line->categories->category[$l]->cat[$m]->title);
 				}
 				else
 				{
 					$category = new MongooseCategory();
 					$category->id_category_supplier = (int)$src_line->categories->category[$l]->cat[$m]->id;
-					$category->title = array((int)$this->src_id_lang => (string)$src_line->categories->category[$l]->cat[$m]->title);
-					$category->id_category_parent = (int)$id_parent;
-					if(!$category->save())
-						ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Categories '.$category->title.' can t be added.');
+					if(Configuration::get('PS_LANG_DEFAULT') != (int)$this->src_id_lang)
+					{
+						$category->title = array((int)$this->src_id_lang => (string)$src_line->categories->category[$l]->cat[$m]->title,
+													(int)Configuration::get('PS_LANG_DEFAULT') => (string)$src_line->categories->category[$l]->cat[$m]->title);
+					}
+					else 
+					{
+						$category->title = array((int)$this->src_id_lang => (string)$src_line->categories->category[$l]->cat[$m]->title);
+					}
+					
 				}
+				
+				$category->id_category_parent = (int)$id_parent;
+				if(!$category->save())
+					MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Categories '.$category->title.' can t be added.');
 				if($l == 0 && $m == 1)
 					$id_default_category = $category->id;
 
@@ -617,7 +664,7 @@ class AdminMongooseImportController extends ModuleAdminController
 				
 				if($total_entry == 0)
 					if(Db::getInstance()->insert('mongoose_category_product', array('id_mongoose_category' => (int)$category->id,'id_mongoose_product' => (int)$product->id)))
-						ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Categories And product can t be added.');
+						MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$src_line->id.'] Categories And product can t be added.');
 					
 			}
 		}
@@ -656,7 +703,7 @@ class AdminMongooseImportController extends ModuleAdminController
 						$new_attribute_group->group_type = 'select';
 						$new_attribute_group->public_name = array($id_lang_fr => 'Taille');
 						$new_attribute_group->add();
-						$id_attribute_group = $new_attribute_group->id_attribute_group;
+						$id_attribute_group = $new_attribute_group->id;
 					}
 				}
 			}
@@ -672,7 +719,7 @@ class AdminMongooseImportController extends ModuleAdminController
 				if($new_attribute_group->add())
 					$id_attribute_group = $new_attribute_group->id;
 				else
-					ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] Can\'t add attribute_group.');
+					MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] Can\'t add attribute_group.');
 			}
 
 			$attr = Attribute::getAttributes($id_lang_fr);
@@ -682,7 +729,7 @@ class AdminMongooseImportController extends ModuleAdminController
 			for ($i = 0; $i < $nvariant; ++$i)
 			{
 				if((int)$src_line->variants->variant[$i]->type != 'S')
-					ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] attribute group different from Y.');
+					MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] attribute group different from Y.');
 				else
 				{
 					$variant_size = (string)$src_line->variants->variant[$i]->title;
@@ -703,12 +750,15 @@ class AdminMongooseImportController extends ModuleAdminController
 						// Si l'attribut n'exsite pas on le crée
 						$new_attribute = new Attribute();
 						$new_attribute->id_attribute_group = $id_attribute_group;
-						$new_attribute->name = array((int)$this->src_id_lang => $variant_size);
+						if(Configuration::get('PS_LANG_DEFAULT') != (int)$this->src_id_lang)
+							$new_attribute->name = array((int)$this->src_id_lang => $variant_size, (int)Configuration::get('PS_LANG_DEFAULT') => $variant_size);
+						else
+							$new_attribute->name = array((int)$this->src_id_lang => $variant_size);
 						$new_attribute->position = Attribute::getHigherPosition($id_attribute_group);
 						if ($new_attribute->add())
 							$id_attribute = $new_attribute->id;
 						else
-							ApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] Can\'t add attribute.');
+							MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] Can\'t add attribute.');
 					} 
 				}
 

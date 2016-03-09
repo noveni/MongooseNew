@@ -21,7 +21,7 @@ class MongooseProduct extends ObjectModel
 	public $weight = 0;
 	public $supplier;
 	public $id_ps_supplier;
-	public $do_update;
+	public $do_update = true;
 	public $name;
 	public $description;
 	public $link_rewrite;
@@ -48,7 +48,7 @@ class MongooseProduct extends ObjectModel
 			'weight' => 					array('type' => self::TYPE_FLOAT, 'validate' => 'isUnsignedFloat'),
 			'id_ps_supplier' => 			array('type' => self::TYPE_INT, 'validate' => 'isUnsignedInt'),
 			'supplier' => 					array('type' => self::TYPE_STRING, 'validate' => 'isString'),
-			'do_update' =>					array('type' => self::TYPE_BOOL),
+			'do_update' =>					array('type' => self::TYPE_BOOL, 'validate' => 'isBool'),
 
 			/* Lang fields */
 			'name' =>						array('type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isString', 'required' => true),
@@ -68,6 +68,20 @@ class MongooseProduct extends ObjectModel
 		$query->from('mongoose_product', 'mp');
 		$query->where('mp.id_product_supplier =\''.(int)$id_product.'\'');
 		return Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($query);
+	}
+
+	public function toggleDoUpdate()
+	{
+		// Object must have a variable called 'active'
+		if (!array_key_exists('do_update', $this))
+			throw new PrestaShopException('property "do_update" is missing in object '.get_class($this));
+
+		// Update only do_update field
+		$this->setFieldsToUpdate(array('do_update' => true));
+		// Update do_update status on object
+		$this->do_update = !(int)$this->do_update;
+		// Change status to do_update/don't do update
+		return $this->update(false);
 	}
 	
 }

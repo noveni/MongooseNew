@@ -1,10 +1,10 @@
 <?php
 
-class ApplicationService {
+class MongooseApplicationService {
 
 	public static function log($action, $value = '')
 	{
-		$logFile = ApplicationService::getLogDir().'log-'.date('Y-m-d').'.txt';
+		$logFile = MongooseApplicationService::getLogDir().'log-'.date('Y-m-d').'.txt';
 
 		if (!file_exists($logFile)){
 			$fp = fopen($logFile, 'w+');

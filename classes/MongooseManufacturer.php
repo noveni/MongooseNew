@@ -10,7 +10,7 @@ class MongooseManufacturer extends ObjectModel
 	public static $definition = array(
 		'table' => 'mongoose_manufacturer',
 		'primary' => 'id_mongoose_manufacturer',
-		'multilang' => true,
+		'multilang' => TRUE,
 		'fields' => array(
 			'id_manufacturer_supplier' => 	array('type' => self::TYPE_INT, 'validate' => 'isUnsignedInt', 'required' => true),
 			/* Lang fields */

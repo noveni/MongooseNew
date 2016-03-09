@@ -41,6 +41,7 @@ class Mongoose extends Module
 		if (empty($parentTab))
 			$parentTab = self::createTab(0,$this->name,'Mongoose - Dropshipping ','AdminMongoose');
 		self::createTab($parentTab, $this->name, 'Products import', 'AdminMongooseImport');
+		self::createTab($parentTab, $this->name, 'Products list', 'AdminMongooseSupplierProduct');
 
 		Configuration::updateValue('MONGOOSE_CURRENT_IMPORT_STEP', 0);
 		Configuration::updateValue('MONGOOSE_CURRENT_PRODUCT_LINE', 0);
@@ -58,6 +59,7 @@ class Mongoose extends Module
 	{
 		$this->uninstallModuleTab('AdminMongoose');
 		$this->uninstallModuleTab('AdminMongooseImport');
+		$this->uninstallModuleTab('AdminMongooseSupplierProduct');
 
 		Configuration::deleteByName('MONGOOSE_CURRENT_IMPORT_STEP');
 		Configuration::deleteByName('MONGOOSE_CURRENT_PRODUCT_LINE');
