@@ -37,7 +37,6 @@ class AdminMongooseSupplierProductController extends ModuleAdminController
 				'align' => 'center',
 				'type' => 'bool',
 				'active' => 'do_update',
-				'ajax' => true
 			)
 		);
 		parent::__construct();
@@ -71,15 +70,22 @@ class AdminMongooseSupplierProductController extends ModuleAdminController
 		{
 			if ($object->toggleDoUpdate())
 			{
-				$matches = array();
-				if (preg_match('/[\?|&]controller=([^&]*)/', (string)$_SERVER['HTTP_REFERER'], $matches) !== false
-					&& strtolower($matches[1]) != strtolower(preg_replace('/controller/i', '', get_class($this))))
-						$this->redirect_after = preg_replace('/[\?|&]conf=([^&]*)/i', '', (string)$_SERVER['HTTP_REFERER']);
-				else
-					$this->redirect_after = self::$currentIndex.'&token='.$this->token;
+				//d($object->reference);
+				//We need to erase the product from table
+				$real_id_product = (int)Db::getInstance()->getValue('SELECT id_product FROM '._DB_PREFIX_.'product WHERE reference = \''.pSQL($object->reference).'\'');
+				$real_product = new Product((int)$real_id_product, true);
+				if ($real_product->delete()){
 
-				$id_category = (($id_category = (int)Tools::getValue('id_category')) && Tools::getValue('id_product')) ? '&id_category='.$id_category : '';
-				$this->redirect_after .= '&conf=5'.$id_category;
+					$matches = array();
+					if (preg_match('/[\?|&]controller=([^&]*)/', (string)$_SERVER['HTTP_REFERER'], $matches) !== false
+						&& strtolower($matches[1]) != strtolower(preg_replace('/controller/i', '', get_class($this))))
+							$this->redirect_after = preg_replace('/[\?|&]conf=([^&]*)/i', '', (string)$_SERVER['HTTP_REFERER']);
+					else
+						$this->redirect_after = self::$currentIndex.'&token='.$this->token;
+
+					$id_category = (($id_category = (int)Tools::getValue('id_category')) && Tools::getValue('id_product')) ? '&id_category='.$id_category : '';
+					$this->redirect_after .= '&conf=5'.$id_category;
+				}
 			}
 			else
 				$this->errors[] = Tools::displayError('An error occurred while updating the do_update field.');

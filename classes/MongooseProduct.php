@@ -83,5 +83,7 @@ class MongooseProduct extends ObjectModel
 		// Change status to do_update/don't do update
 		return $this->update(false);
 	}
+
+	
 	
 }

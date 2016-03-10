@@ -1,11 +1,14 @@
 <?php
 
+require_once (dirname(__file__) . '/classes/application/MongooseApplicationService.php');
+
 if (!defined('_PS_VERSION_'))
 	exit;
 
 class Mongoose extends Module
 {
 	private $id_ps_supplier;
+
 	public function __construct()
 	{
 		$this->name = 'mongoose';
@@ -39,9 +42,28 @@ class Mongoose extends Module
 		//Ajout d'un onglet à la racine du site
 		$parentTab = Tab::getIdFromClassName('AdminMongoose');
 		if (empty($parentTab))
-			$parentTab = self::createTab(0,$this->name,'Mongoose - Dropshipping ','AdminMongoose');
-		self::createTab($parentTab, $this->name, 'Products import', 'AdminMongooseImport');
-		self::createTab($parentTab, $this->name, 'Products list', 'AdminMongooseSupplierProduct');
+			$parentTab = MongooseApplicationService::createTab(0,$this->name,'Mongoose - Dropshipping ','AdminMongoose');
+		//MongooseApplicationService::createTab($parentTab, $this->name, 'Products import', 'AdminMongooseImport');
+		//self::createTab($parentTab, $this->name, 'Products list', 'AdminMongooseSupplierProduct');
+
+		initTabsStuff();
+		// $list_tab = array(
+		// 	array(
+		// 		'name' => 'Products import',
+		//  		'class_name' => 'AdminMongooseImport',
+		//  		'active' => 0
+		// 	),
+		// 	array(
+		// 		'name' => 'Products list',
+		//  		'class_name' => 'AdminMongooseSupplierProduct',
+		//  		'active' => 0
+		// 	)
+		// );
+
+
+		//Configuration::updateValue('MONGOOSE_TAB_LIST', serialize($list_tab));
+		//MongooseApplicationService::installAllTabs($parentTab,$this->name,$this->list_tab);
+		
 
 		Configuration::updateValue('MONGOOSE_CURRENT_IMPORT_STEP', 0);
 		Configuration::updateValue('MONGOOSE_CURRENT_PRODUCT_LINE', 0);
@@ -57,10 +79,16 @@ class Mongoose extends Module
 
 	public function uninstall()
 	{
-		$this->uninstallModuleTab('AdminMongoose');
-		$this->uninstallModuleTab('AdminMongooseImport');
-		$this->uninstallModuleTab('AdminMongooseSupplierProduct');
 
+		MongooseApplicationService::uninstallModuleTab('AdminMongoose');
+		
+		//MongooseApplicationService::uninstallModuleTab('AdminMongooseImport');
+		//$this->uninstallModuleTab('AdminMongooseSupplierProduct');
+
+		//On va chercher la liste des onglet enregistré et on les supprimes
+		MongooseApplicationService::uninstallAllTabs(unserialize(Configuration::get('MONGOOSE_TAB_LIST')));
+		
+		Configuration::deleteByName('MONGOOSE_TAB_LIST');
 		Configuration::deleteByName('MONGOOSE_CURRENT_IMPORT_STEP');
 		Configuration::deleteByName('MONGOOSE_CURRENT_PRODUCT_LINE');
 
@@ -70,6 +98,81 @@ class Mongoose extends Module
 			return false;
 
 		return true;
+	}
+
+	public function getContent()
+	{
+		$_html = null;
+		// Make a small verification to see if the table exist, if is there a table in, and if not we need to install all the crap
+		$this->initTabsStuff();
+
+		if (Tools::isSubmit('installSupPro'.$this->name))
+		{
+			// Ici on fait on peut générer un nouvel onglet
+			//$this->installProductSupplierCtrl();
+
+		}
+
+
+
+
+		$list_tab_original = unserialize(Configuration::get('MONGOOSE_TAB_LIST'));
+		$list_tab_to_tpl = $list_tab_original;
+		$nlist_tab = count($list_tab_to_tpl);
+		for($i = 0; $i < $nlist_tab; ++$i){
+			$list_tab_to_tpl[$i]['link'] = AdminController::$currentIndex.'&token='.Tools::getAdminTokenLite('AdminModules').'&configure='.$this->name.'&install'.$list_tab_to_tpl[$i]['class_name'].$this->name;
+			//On va tester si y a un submit
+			if (Tools::isSubmit('install'.$list_tab_to_tpl[$i]['class_name'].$this->name))
+			{
+				$list_tab_original[$i]['active'] = 1;
+				$list_tab_to_tpl[$i]['active'] = 1;
+				Configuration::updateValue('MONGOOSE_TAB_LIST', serialize($list_tab_original));
+				MongooseApplicationService::createTab(Tab::getIdFromClassName('AdminMongoose'), $this->name,$list_tab_original[$i]['name'],$list_tab_original[$i]['class_name']);
+				//d('ok on install '.$list_tab[$i]['class_name']);
+
+			}
+
+		}
+		
+		//We need to make loop to check wether or not the controller tab is installed
+		$this->context->smarty->assign(
+			array(
+				'list_tab' => $list_tab_to_tpl 
+			)
+		);
+
+		$_html .= $this->display(__FILE__, 'views/templates/admin/configpanel.tpl');
+
+		return $_html;
+	}
+
+	private function installProductSupplierCtrl()
+	{
+		// We do a small job verification to see a configuration array exist
+		if(!ConfigurationCore::get('MONGOOSE_TAB_LIST'))
+		{
+			Configuration::updateValue('MONGOOSE_TAB_LIST','');
+		} 
+		
+		// else the job is to retrieve the data and unserialize it,
+		// And if a tab info if is not present
+		$tab_existing = false;
+		$tab_list = unserialize(Configuration::get('MONGOOSE_TAB_LIST'));
+		$ntab_list = count($tab_list);
+		for($i = 0; $i < $ntab_list; ++$i)
+		{
+			//Si on trouve une occurence de l'onglet dans la liste, on notifie la variable $tab_existing qu'il faudrat ajouter l'onglet
+			if($tab_list[$i]['class_name'] == 'AdminMongooseSupplierProduct')
+				$tab_existing = true;
+		}
+		if(!$tab_existing){
+			$tab_list[] = array(
+				'name' => 'Products list',
+		 		'class_name' => 'AdminMongooseSupplierProduct'
+			);
+			Configuration::updateValue('MONGOOSE_TAB_LIST',serialize($tab_list));
+			self::createTab(Tab::getIdFromClassName('AdminMongoose'), $this->name, 'Product list', 'AdminMongooseSupplierProduct');
+		}
 	}
 
 	/* Création des tables */
@@ -103,34 +206,30 @@ class Mongoose extends Module
 		return true;
 	}
 
-	static function createTab($id_parent, $module, $name, $class_name)
+	private function initTabsStuff()
 	{
-		$Tab = new Tab();
-		$Tab->module = $module;
-		foreach (Language::getLanguages(true) as $languages)
+		$list_tab = array(
+			array(
+				'name' => 'Products import',
+		 		'class_name' => 'AdminMongooseImport',
+		 		'active' => 0
+			),
+			array(
+				'name' => 'Products list',
+		 		'class_name' => 'AdminMongooseSupplierProduct',
+		 		'active' => 0
+			)
+		);
+
+		$nlist_tab = count($list_tab);
+		for ($i = 0; $i < $nlist_tab; ++$i)
 		{
-			$Tab->name[$languages["id_lang"]] = $name;
+			$idTab = Tab::getIdFromClassName($list_tab[$i]['class_name']);
+			if ($idTab) // Si l'onglet existe on change sa valeur active dans le tableau list_tab
+				$list_tab[$i]['active'] = 1;
 		}
-
-		$Tab->id_parent = $id_parent;
-		$Tab->class_name = $class_name;
-		$r = $Tab->save();
-
-		if ($r == false)
-			return false;
-
-		return $Tab->id;
-	}
-
-	private function uninstallModuleTab($tabClass)
-	{
-		$idTab = Tab::getIdFromClassName($tabClass);
-		if ($idTab != 0)
-		{
-			$tab = new Tab($idTab);
-			$tab->delete();
-			return true;
-		}
-		return false;
+		Configuration::updateValue('MONGOOSE_TAB_LIST', serialize($list_tab));
+		$parentTab = Tab::getIdFromClassName('AdminMongoose');
+		MongooseApplicationService::installAllTabs($parentTab,$this->name,$list_tab);
 	}
 }
