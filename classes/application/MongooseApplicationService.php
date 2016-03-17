@@ -79,4 +79,45 @@ class MongooseApplicationService {
 		}
 	}
 
+	public static function uploadXMLFile($file,$path,$final_filename)
+	{
+		if (isset($file) && !empty($file['error']))
+		{
+			switch ($file['error']) 
+			{
+				case UPLOAD_ERR_INI_SIZE:
+					$file['error'] = Tools::displayError('The uploaded file exceeds the upload_max_filesize directive in php.ini. If your server configuration allows it, you may add a directive in your .htaccess.');
+					break;
+				case UPLOAD_ERR_FORM_SIZE:
+					$file['error'] = Tools::displayError('The uploaded file exceeds the post_max_size directive in php.ini.
+						If your server configuration allows it, you may add a directive in your .htaccess, for example:')
+					.'<br/><a href="'.$this->context->link->getAdminLink('AdminMeta').'" >
+					<code>php_value post_max_size 20M</code> '.
+					Tools::displayError('(click to open "Generators" page)').'</a>';
+					break;
+				break;
+				case UPLOAD_ERR_PARTIAL:
+					$file['error'] = Tools::displayError('The uploaded file was only partially uploaded.');
+					break;
+				break;
+				case UPLOAD_ERR_NO_FILE:
+					$file['error'] = Tools::displayError('No file was uploaded.');
+					break;
+				break;
+			}
+		}
+		elseif (!preg_match('/.*\.xml$/i', $file['name']))
+			$file['error'] = Tools::displayError('The extension of your file should be .xml.');
+		elseif (!@filemtime($file['tmp_name']) || 
+			!move_uploaded_file($file['tmp_name'], $path.str_replace("\0", '', $final_filename)))
+			$file['error'] = $this->l('An error occurred while uploading / copying the file.');
+		else
+		{
+			@chmod($path.$final_filename, 0664);
+			$file['filename'] = str_replace('\0', '', $final_filename);
+		}
+
+		return $file;
+	}
+
 }
