@@ -21,7 +21,7 @@ class AdminMongooseImportController extends ModuleAdminController
 	public function setMedia()
 	{
 		parent::setMedia();
-		// $this->addJS(__PS_BASE_URI__.'modules/'.$this->module->name.'/js/mongooseimport.js');
+		$this->addJS(__PS_BASE_URI__.'modules/'.$this->module->name.'/js/mongoose-copyfeed.js');
 	}
 
 	public function renderList()
@@ -121,52 +121,52 @@ class AdminMongooseImportController extends ModuleAdminController
 
 	public function panel_list_file()
 	{
-		$fields_list = array(
-			'id_mongoose_xml_file' => array(
-				'title' => $this->l('Id'),
-				'width' => 140,
-				'type' => 'text',
-			),
-			'src_file' => array(
-				'title' => $this->l('Filename'),
-				'width' => 'auto',
-				'type' => 'text',
-			),
-			'src_line_total' => array(
-				'title' => $this->l('Total lines'),
-				'width' => 140,
-				'type' => 'text'
-			),
-			'src_current_line' => array(
-				'title' => $this->l('Line imported'),
-				'width' => 140,
-				'type' => 'text',
-			),
-			'src_id_lang' => array(
-				'title' => $this->l('Language'),
-				'width' => 140,
-				'type' => 'text',
-			)
+		$files = MongooseXmlFile::getAllFiles();
+		
+		$nfiles = count($files);
+		for ($i = 0; $i < $nfiles; ++$i)
+		{
+			$files[$i]['src_lang_iso'] = Language::getIsoById((int)$files[$i]['src_id_lang']);
+			$files[$i]['percent'] = number_format(((int)$files[$i]['src_current_line'] / (int)$files[$i]['src_line_total']) * 100,2);
+		}
+		$this->context->smarty->assign(array(
+			'files' => $files,
+			'count_files' => $nfiles,
+			'module_link' => $this->context->link->getAdminLink('AdminMongooseImport',true),
+		));
+		return $this->context->smarty->fetch(_PS_MODULE_DIR_.'mongoose/views/templates/admin/panel_list_file.tpl');
+	}
+
+	public function displayAjaxcopyMongooseXmlLine()
+	{
+		$file = new MongooseXmlFile(Tools::getValue('id_file'));
+		$return = array(
+			'status' => 'looping_on_xml_file',
+			'message' => 'Copying the feed',
+			'xml_feed_file' => $file,
+			'percent' => number_format(((int)$file->src_current_line / (int)$file->src_line_total) * 100, 2)
 		);
-		$helper = new HelperList();
-		$helper->shopLinkType = '';
-		$helper->simpler_header = false;
 
-		$helper->actions = array('edit', 'delete', 'view');
+		if ((int)$file->id_mongoose_xml_file < $file->src_line_total)
+		{
+			++$file->src_current_line;
+			$return['current_line_in_xml_feed_file'] = $file->src_current_line;
+		}
+		else
+		{
+			$return = array_merge($return, array('message' => 'On est arrive à la fin du fichier', 'status' => 'end_file'));
+		}
+		$file->save();
+		die(Tools::jsonEncode($return));
+	}
 
-		$helper->identifier = 'id_mongoose_xml_file';
-		$helper->title = $this->l('All xml file');
-		$helper->token = $this->context->controller->token;
+	public function displayAjaxresetMongooseXmlCurrentLine()
+	{
 
-		$helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->module->name;
+	}
 
-		//$helper->identifier = 'id_mongoose_xml_file';
-		//$helper->title = 'Toto';
-		//$helper->table = 'ps_mongoose_product';
+	private function copyXmlLineToDb($line)
+	{
 
-		//$helper->token = Tools::getAdminTokenLite('AdminModules');
-	    //$helper->currentIndex = AdminController::$currentIndex.'&configure='.'titi';
-		//d(MongooseXmlFile::getAllFiles());
-	    return $helper->generateList(MongooseXmlFile::getAllFiles(), $fields_list);
 	}
 }
