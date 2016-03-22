@@ -40,12 +40,14 @@ class MongooseProductAttribute extends ObjectModel
 
 	public static function getByIdMgProduct($id_mg_product)
 	{
-		$results = Db::getInstance()->executes('
+		$results = Db::getInstance()->executeS('
 			SELECT *
 			FROM `'._DB_PREFIX_.'mongoose_product_attribute`
 			WHERE `id_mongoose_product` = \''.(int)$id_mg_product.'\'');
-		if($results)
+		if($results && !empty($results))
+		{
 			return $results;
+		}
 
 		return false;
 	}

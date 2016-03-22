@@ -14,8 +14,8 @@
 									<th width="150">{l s='Filename'}</th>
 									<th width="50">{l s='Language'}</th>
 									<th width="80">{l s='Nb of line'}</th>
-									<th>{l s='Current line'}</th>
-									<th>Action</th>
+									<th width="80">{l s='Current line'}</th>
+									<th width="260">Action</th>
 									<th>{l s='Progress'}</th>
 								</tr>
 							</thead>
@@ -29,7 +29,8 @@
 									<td class="info current_line">{$file.src_current_line}</td>
 									<td class="text-center">
 										<button type="button" class="btn btn-primary btn-sm copy-feed" data-url='{$module_link}' data-idfile='{$file.id_mongoose_xml_file}'>{l s='Copy the feed'}</button>
-										<button type="button" class="btn btn-primary btn-sm reset-src_current_line" data-url='{$module_link}' data-idfile='{$file.id_mongoose_xml_file}'>{l s='RàZ'}</button>
+										<button type="button" class="btn btn-primary btn-sm reset_src_current_line" data-url='{$module_link}' data-idfile='{$file.id_mongoose_xml_file}'>{l s='RàZ'}</button>
+										<button type="button" class="btn btn-primary btn-sm stop-copying" data-url='{$module_link}' data-idfile='{$file.id_mongoose_xml_file}'>{l s='Stop'}</button>
 									</td>
 									<td>
 										<div class="progress">
@@ -51,3 +52,4 @@
 		</div>
 	</div>
 </div>
+<div id="error_stant"></div>
