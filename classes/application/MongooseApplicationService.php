@@ -120,6 +120,57 @@ class MongooseApplicationService {
 		return $file;
 	}
 
+	public static function importImage($product,$base_url = false,$deleteImage = false)
+	{
+		if (!$base_url)
+			$base_url = 'http://cdn.edc-internet.nl/500/';
+
+		if (isset($product->image) && is_array($product->image) && count($product->image))
+		{
+			if ($deleteImage)
+			{
+				$img_array_to_del = Image::getImages((int)Language::getIdByIso('fr'), $product->id);
+				$count_img = count($img_array_to_del);
+				for ($img_i=0; $img_i<$count_img;++$img_i)
+				{
+					$img_to_del = new Image($img_array_to_del[$img_i]['id_image']);
+					$img_to_del->delete();
+				}
+			}
+
+			foreach ($product->image as $key => $filename)
+			{
+				$url = $base_url.$filename;
+				$url = trim($url);
+				$error = false;
+				if (!empty($url))
+				{
+					$url = str_replace(' ', '%20', $url);
+					$image = new Image();
+					$image->id_product = (int)$product->id;
+					$image->position = Image::getHighestPosition($product->id) + 1;
+					$image->cover = true;
+					// file_exists doesn't work with HTTP protocol
+					if ($image->add())
+					{
+						$image->associateTo($shops);
+						if (!AdminImportController::copyImg($product->id,$image->id,$url,'products',!Tools::getValue('regenerate')))
+						{
+							$image->delete();
+							$this->warnings[] = sprintf(Tools::displayError('Error copying image: %s'), $url);
+						}
+					}
+					else
+						$error = true;
+				}
+				else
+						$error = true;
+					if ($error)
+						$this->warnings[] = sprintf(Tools::displayError('Product #%1$d: the picture (%2$s) cannot be saved.'), $image->id_product, $url);
+			}
+		}
+	}
+
 	
 
 }

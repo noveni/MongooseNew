@@ -26,6 +26,7 @@ class AdminMongooseImportController extends ModuleAdminController
 
 	public function renderList()
 	{
+		$this->tmp_deleteAllEmptyGroupAttribute();
 		// $path = _PS_MODULE_DIR_.'mongoose'.DIRECTORY_SEPARATOR.'import'.DIRECTORY_SEPARATOR;
 		// $xml_content = simplexml_load_file($path.'feed_fr.xml');
 		// $this->copyXmlLineToDb($xml_content->product[2],1);
@@ -151,12 +152,11 @@ class AdminMongooseImportController extends ModuleAdminController
 		$this->context->smarty->assign(array(
 			'count_row' => $line_count,
 			'current_line_product' => $current_line_product,
-			'percent' => number_format(($current_line_product / $line_count) * 100,2),
+			'percent' => $line_count==0 ? 0 : number_format(($current_line_product / $line_count) * 100,2),
 			'module_link' => $this->context->link->getAdminLink('AdminMongooseImport',true)
 
 		));
 		return $this->context->smarty->fetch(_PS_MODULE_DIR_.'mongoose/views/templates/admin/panel_import_to_product.tpl');
-
 	}
 
 	public function displayAjaxcopyMongooseXmlLine()
@@ -383,6 +383,7 @@ class AdminMongooseImportController extends ModuleAdminController
 
 			if($natttibute_group > 0)
 			{
+				// we loop on the attribute group to check if taille exist, if he exist we catch his id_attribute_group
 				for($j = 0; $j < $natttibute_group; $j++)
 				{
 					if (strtolower($attribute_group[$j]['name']) == 'taille')
@@ -390,6 +391,7 @@ class AdminMongooseImportController extends ModuleAdminController
 				}
 			}
 
+			// if we don't have id_attribute_group, we go creat this crap
 			if (!isset($id_attribute_group))
 			{
 				// Add group attribute
@@ -405,25 +407,22 @@ class AdminMongooseImportController extends ModuleAdminController
 					MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] Can\'t add attribute_group.');
 			}
 
-
 			$attr = Attribute::getAttributes($id_lang_fr);
 			$nattr = count($attr);
 			
-
 			for ($i = 0; $i < $nvariant; ++$i)
 			{
-				
 				if((int)$line->variants->variant[$i]->type != 'S')
 					MongooseApplicationService::log('Add a line in intermediaire table','[pid:'.(int)$product->id_product_supplier.'] attribute group different from Y.');
 				else
 				{
-					$variant_size = (string)$line->variants->variant[$i]->title;
+					$variant_size = strtolower((string)$line->variants->variant[$i]->title);
 					// Si l'attribut existe déjà ok on prend son ID,
 					if(Attribute::isAttribute($id_attribute_group, $variant_size, $id_lang_fr))
 					{
 						for($k = 0; $k<$nattr;++$k)
 						{
-							if( ($attr[$k]['id_attribute_group'] == (int)$id_attribute_group) && (strtolower($attr[$k]['name']) == (int)$variant_size)){
+							if( ($attr[$k]['id_attribute_group'] == (int)$id_attribute_group) && (strtolower($attr[$k]['name']) == (string)$variant_size)){
 								$id_attribute = $attr[$k]['id_attribute'];
 							}
 						}
@@ -448,7 +447,7 @@ class AdminMongooseImportController extends ModuleAdminController
 				//On test pr voir si l'attribut existe déjà
 				if($product_attribute_id = MongooseProductAttribute::getIdMongooseProductAttributeByIdSupplier((int)$line->variants->variant[$i]->id))
 				{
-					$product_attribute = new MongooseProductAttribute((int)$line->variants->variant[$i]->id);
+					$product_attribute = new MongooseProductAttribute((int)$product_attribute_id);
 				}
 				else
 				{
@@ -507,7 +506,6 @@ class AdminMongooseImportController extends ModuleAdminController
 				$product->active = 1;
 			else
 				$product->active = 0;
-			$product->image = unserialize($mongoose_product->pics_list);
 			// :TODO: change to be correct
 			$product->id_category_default = 2;
 
@@ -660,9 +658,17 @@ class AdminMongooseImportController extends ModuleAdminController
 				$product_supplier->product_supplier_reference = $product->supplier_reference;
 				$product_supplier->save();
 			}
+
+
 			//Image
+			$product->image = unserialize($mongoose_product->pics_list);
 			$base_url = 'http://cdn.edc-internet.nl/500/';
-			if (isset($product->image) && is_array($product->image) && count($product->image))
+			if ($id_product)
+				$deleteImage = true;
+			else
+				$deleteImage = false;
+			MongooseApplicationService::importImage($product,$base_url,$deleteImage);
+			/*if (isset($product->image) && is_array($product->image) && count($product->image))
 			{
 				if ($id_product){
 					$arr_image_to_del = Image::getImages($id_lang_fr, $product->id);
@@ -703,12 +709,18 @@ class AdminMongooseImportController extends ModuleAdminController
 					if ($error)
 						$this->warnings[] = sprintf(Tools::displayError('Product #%1$d: the picture (%2$s) cannot be saved.'), $image->id_product, $url);
 				}
-			}
+			}*/
 		}
 		$return['id_product'] = $product->id;
 		$return['product'] = $product;
 		
 		return $return;
+	}
 
+	private function tmp_deleteAllEmptyGroupAttribute()
+	{
+		$units = new PrestaShopCollection('MongooseProduct');
+		//$units->where('id_mongoose_product','=','1');
+		d($units->getAll());
 	}
 }

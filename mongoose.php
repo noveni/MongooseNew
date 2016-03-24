@@ -317,6 +317,16 @@ class Mongoose extends Module
 				'name' => 'Products list',
 		 		'class_name' => 'AdminMongooseSupplierProduct',
 		 		'active' => 1
+			),
+			array(
+				'name' => 'Category list',
+		 		'class_name' => 'AdminMongooseSupplierCategory',
+		 		'active' => 1
+			),
+			array(
+				'name' => 'Product Attribute',
+		 		'class_name' => 'AdminMongooseSupplierProductAttribute',
+		 		'active' => 1
 			)
 		);
 

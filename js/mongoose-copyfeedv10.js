@@ -4,6 +4,7 @@ $(document).ready(function(){
 	$(".reset_src_current_line").on('click',resetSrcCurrentLine)
 	$(".stop-copying").on('click',stopCopying)
 	$(".import-product").on('click',ImportProductLauncher)
+	$("#custom-import-form").on('submit'CustomImportProductLauncher)
 })
 CopyFeedLauncher = function(){
 	copyInstance = true
@@ -12,6 +13,10 @@ CopyFeedLauncher = function(){
 ImportProductLauncher = function(){
 	importInstance = true
 	ImportProduct(this)
+}
+CustomImportProductLauncher = function(event){
+	event.preventDefault()
+	CustomImportProduct(this)
 }
 CopyFeed = function(btn){
 	id_file = $(btn).data('idfile')
@@ -95,6 +100,36 @@ ImportProduct = function(btn){
 			setTimeout(function(){
 				ImportProduct($btn);
 			}, 10000);
+		}
+	})
+}
+CustomImportProduct = function(form){
+	$.ajax({
+		url: $(form).attr('action'),
+		data: {
+			ajax: true,
+			action: 'customImportMongooseProduct'
+		},
+		method: 'POST',
+		dataType: 'json',
+		success: function(data) {
+			console.log('Success : '+JSON.stringify(data))
+			if(data.status !== undefined){
+				if(data.status == 'end_table')
+					console.log('end of table line')
+				else if (data.status == 'custom_looping_on_db_table')
+				{
+					$("#current_line_product").html(data.current_mongoose_product_line)
+					$("#import-progressbar").html(data.percent + '%').attr('aria-valuenow',data.percent).width(data.percent + '%')
+					CustomImportProduct($(form))
+				}
+			}
+		},
+		error: function(data){
+			console.log('Error : '+JSON.stringify(data))
+			setTimeout(function(){
+				CustomImportProduct($(form))
+			}, 5000)
 		}
 	})
 }
